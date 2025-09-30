@@ -1,0 +1,273 @@
+# Build Your HR Policies Knowledge Agent with Mastra
+
+> Create a Mastra agent that retrieves authoritative HR policy content from a curated knowledge base, answers employee questions with sourced excerpts & disclaimers, and plugs into CometChat.
+
+***
+
+## What You’ll Build
+
+- **HR policy knowledge agent** (`hr-policy`) with retrieval-first behavior.
+- Automatic doc search (primary namespace `hr`, fallback `default`).
+- Cited, disclaimer-compliant responses (sources list + HR guidance).
+- CometChat AI Agent integration for in‑chat HR policy Q&A.
+
+***
+
+## Prerequisites
+
+- Mastra project (this folder or `npx create-mastra@latest`).
+- Node.js 18+ (20+ recommended).
+- OpenAI API key in `.env` as `OPENAI_API_KEY`.
+- CometChat application.
+
+***
+
+## Quick links
+
+- **Project README**: ./README.md
+- **Agent**: ./src/mastra/agents/hr-policy-agent.ts
+- **Retriever Tool**: ./src/mastra/tools/docs-retriever.ts
+- **Tools Index**: ./src/mastra/tools/index.ts
+- **Knowledge Base**: ./knowledge/hr/*.md
+- **Mastra bootstrap**: ./src/mastra/index.ts
+- **Environment variables**: README → Environment Variables
+
+_Local dev base_: `http://localhost:4111/api`
+
+***
+
+## How it works
+
+The HR Policy Agent implements a retrieval-first response pattern:
+
+1. Receives a user policy question (`/api/agents/hr-policy/generate`).
+2. Calls `docsRetriever` tool (namespace `hr`) to locate relevant markdown documents.
+3. Falls back to `default` namespace if result set is empty.
+4. Synthesizes an answer ONLY from retrieved excerpts; no hallucinated content.
+5. Appends mandatory disclaimers + source file basenames (`Sources: file1.md, file2.md`).
+6. For sensitive / escalatory topics (harassment, safety, legal risk) instructs immediate HR contact.
+
+Key components:
+- Agent config: `hr-policy-agent.ts`
+- Retrieval tool: `docs-retriever.ts`
+- Knowledge assets: `knowledge/hr/*.md`
+
+***
+
+## Setup
+
+<Steps>
+  <Step title="Prepare project">Install dependencies; create <code>.env</code> with <code>OPENAI_API_KEY</code>.</Step>
+  <Step title="Review knowledge base">Open <code>knowledge/hr/</code> for policy docs you can edit / extend.</Step>
+  <Step title="Inspect agent">Read <code>hr-policy-agent.ts</code> for instructions & disclaimer logic.</Step>
+  <Step title="Test locally">Run <code>npx mastra dev</code> (or <code>npm run dev</code>) and query the agent.</Step>
+  <Step title="Validate sources">Ensure responses end with <code>Sources:</code> listing file basenames.</Step>
+  <Step title="Connect to CometChat">Register agent ID <code>hr-policy</code> in AI Agents dashboard.</Step>
+</Steps>
+
+***
+
+## Project Structure
+
+- Knowledge Base
+  - `knowledge/hr/company-leave-policies.md`
+  - `knowledge/hr/employee-benefits-guide.md`
+  - `knowledge/hr/general-hr-policies-faq.md`
+- Agent & Tools
+  - `src/mastra/agents/hr-policy-agent.ts`
+  - `src/mastra/tools/docs-retriever.ts`
+  - `src/mastra/tools/index.ts`
+- Runtime
+  - `src/mastra/index.ts`
+  - `package.json`, `tsconfig.json`, `README.md`
+
+***
+
+## Step 1 - Configure the Agent
+
+The `hr-policy` agent must:
+- Always call `docsRetriever` first (namespace `hr`).
+- Provide disclaimers + encourage contacting HR for complex matters.
+- Include a `Sources:` line listing source basenames.
+- Avoid legal advice & refrain from definitive HR decisions.
+
+***
+
+## Step 2 - Document Retrieval
+
+`docs-retriever.ts` handles:
+- File discovery & content loading.
+- Relevance scoring (token / semantic style depending on implementation).
+- Returning structured snippets to the agent.
+
+Extend it for:
+- Embedding-based ranking.
+- Section-level chunking.
+- Cache layers for frequent queries.
+
+***
+
+## Step 3 - Run the Agent
+
+<Steps>
+  <Step title="Install deps"><code>npm install</code></Step>
+  <Step title="Start server"><code>npx mastra dev</code></Step>
+  <Step title="Query policy"><code>POST /api/agents/hr-policy/generate</code></Step>
+  <Step title="Check output">Confirm disclaimers + sources appended.</Step>
+</Steps>
+
+Primary endpoint:
+- POST `/api/agents/hr-policy/generate`
+
+***
+
+## Step 4 - Deploy API
+
+- Build (if needed): `npm run build`.
+- Deploy behind HTTPS (Render / Vercel / Fly.io / AWS).
+- Verify public reachability of `/api/agents/hr-policy/generate`.
+- Add caching / CDN if high read volume expected.
+
+***
+
+## Step 5 - Configure in CometChat
+
+<Steps>
+  <Step title="Open Dashboard">Go to <a href="https://app.cometchat.com/" target="_blank" rel="noreferrer">CometChat Dashboard</a>.</Step>
+  <Step title="AI Agents">Navigate to <b>AI Agents</b>.</Step>
+  <Step title="Add agent">Provider = Mastra, Agent ID = <code>hr-policy</code>.</Step>
+  <Step title="Deployment URL">Set to public <code>/api/agents/hr-policy/generate</code>.</Step>
+  <Step title="Enable">Save & toggle ON.</Step>
+</Steps>
+
+***
+
+## Step 6 - Customize in Chat Builder
+
+<Steps>
+  <Step title="Open variant">Select the HR Policy agent variant.</Step>
+  <Step title="Customize & Deploy">Adjust theme / header / disclaimers.</Step>
+  <Step title="Preview">Send sample leave / benefits / remote policy queries.</Step>
+  <Step title="Validate Sources">Ensure each answer ends with <code>Sources:</code>.</Step>
+</Steps>
+
+<Frame>
+  <img src="https://mintcdn.com/cometchat-22654f5b/2U5tVIzH12dbbFtr/images/ai-agent-chat-builder-preview.png?fit=max&auto=format&q=85" width="1600" height="900" />
+</Frame>
+
+***
+
+## Step 7 - Integrate
+
+<CardGroup>
+  <Card title="No Code - Widget" icon={<img src="/docs/images/products/ai-agents.svg" alt="Widget" />} description="Embed / script" href="/widget/ai-agents" horizontal />
+  <Card title="React UI Kit" icon={<img src="/docs/images/icons/react.svg" alt="React" />} href="https://www.cometchat.com/docs/ui-kit/react/ai-assistant-chat" horizontal>Pre-built UI components</Card>
+</CardGroup>
+
+***
+
+## Step 8 - Test Your Setup
+
+<Steps>
+  <Step title="Leave policy">Returns vacation tiers + source.</Step>
+  <Step title="Benefits details">Includes coverage summary + disclaimers.</Step>
+  <Step title="Remote work">Fetches relevant policy excerpt.</Step>
+  <Step title="Sensitive topic">Triggers escalation advisory text.</Step>
+</Steps>
+
+Example cURL:
+
+```bash
+# Leave Policy
+curl -s -X POST http://localhost:4111/api/agents/hr-policy/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"How much PTO do I accrue?"}]}'
+```
+```bash
+# Benefits
+curl -s -X POST http://localhost:4111/api/agents/hr-policy/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"Summarize our health insurance coverage"}]}'
+```
+```bash
+# Remote Work
+curl -s -X POST http://localhost:4111/api/agents/hr-policy/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"What is the remote work policy?"}]}'
+```
+```bash
+# Sensitive Issue (escalation prompt)
+curl -s -X POST http://localhost:4111/api/agents/hr-policy/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"I am experiencing discrimination"}]}'
+```
+
+***
+
+## Response Expectations
+
+| Situation | Behavior |
+|-----------|----------|
+| Standard question | Returns sourced excerpt + disclaimers |
+| Multiple documents | Consolidates; lists all basenames in Sources |
+| No match | Advises contacting HR directly; still adds disclaimer |
+| Sensitive topic | Immediate escalation advisory + disclaimers + (if possible) limited policy context |
+
+***
+
+## Security & Production Checklist
+
+- Enforce auth (API key / JWT) for generate endpoint if internal.
+- Sanitize logs (no employee PII in query persistence).
+- Version policy documents; add change log.
+- Add rate limiting (e.g., 429 after threshold).
+- Implement ETag / caching for static doc loads.
+- Monitor answer drift (compare source vs output for QA).
+- Provide accessibility review for UI embedding.
+
+***
+
+## Troubleshooting
+
+| Issue | Hint |
+|-------|------|
+| Empty Sources | Ensure markdown files exist & retriever returns results. |
+| Agent hallucinating | Re-emphasize tool-first instruction; tighten prompt. |
+| Slow responses | Preload + cache parsed docs; reduce model size. |
+| Sensitive topic not flagged | Expand escalation keyword list in agent instructions. |
+| Missing disclaimers | Confirm instructions block unmodified; add post-processor if needed. |
+
+***
+
+## Environment Variables
+
+```bash .env
+OPENAI_API_KEY=""   # Required OpenAI key
+PORT=4111            # Server port
+```
+
+(Optional): Add analytics, cache, or auth related env vars as you productionize.
+
+***
+
+## Extending the Agent
+
+- Add embedding store + semantic rerank.
+- Introduce section-level chunk metadata & highlight spans.
+- Implement freshness scoring (recent policy versions first).
+- Add multilingual policy variants + language detection.
+- Instrument quality metrics (precision / citation coverage).
+
+***
+
+## Next Steps
+
+- Integrate with ticketing for unresolved or sensitive queries.
+- Add analytics dashboard for top policy questions.
+- Automate policy change notifications via feed or digest.
+
+***
+
+> Disclaimer: This agent provides general policy information only. For complex, sensitive, or legally significant matters, employees must contact HR directly.
+
+Happy building! 🎉

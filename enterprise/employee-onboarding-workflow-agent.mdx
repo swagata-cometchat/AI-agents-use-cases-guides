@@ -1,0 +1,333 @@
+# Build Your Employee Onboarding Workflow Agent with Mastra
+
+> Create a Mastra agent that orchestrates employee onboarding: collects info, processes I-9 docs, verifies identity & work authorization, runs background checks, provisions access, checks compliance — then connect it to CometChat.
+
+***
+
+## What You’ll Build
+
+- **Mastra agents** for conversational onboarding guidance and workflow decisions.
+- Triggered only when explicitly mentioned (e.g., `@agent`).
+- REST endpoints for each onboarding step: initiate → personal info → employment info → documents → identity → background → system access → tax → compliance → status.
+- Pluggable into **CometChat** chats as an AI Agent.
+
+***
+
+## Prerequisites
+
+- A Mastra project (`npx create-mastra@latest my-mastra-app`).
+- Node.js 18+.
+- OpenAI API key in `.env` as `OPENAI_API_KEY`.
+- A CometChat application.
+
+***
+
+## Quick links
+
+- **Project README**: ./README.md
+- **Key Tools**: ./src/mastra/tools/verification-tools.ts
+- **Agents**: ./src/mastra/agents/onboarding-agent.ts
+- **Routes (handlers)**: ./src/mastra/server/routes/onboarding.ts
+- **Route registration**: ./src/mastra/server/routes.ts
+- **Mastra server config**: ./src/mastra/index.ts
+- **Environment variables**: see README → Environment Variables
+
+(If you expose Swagger UI, adjust link to: `http://localhost:4001/swagger-ui`)
+
+***
+
+## How it works
+
+This example implements a workflow‑oriented Employee Onboarding Agent that:
+
+- Orchestrates onboarding through REST routes (status progression stored in memory for demo).
+- Uses tools in `verification-tools.ts` for: document OCR simulation, identity & work authorization verification, background checks, system provisioning, compliance scoring.
+- Exposes two chat agents:
+  - `employee-onboarding` — conversational guidance & next-step explanations.
+  - `hr-workflow-manager` — decision / escalation logic & routing recommendations.
+- Sanitizes errors via `safeErrorMessage.ts` before returning responses.
+
+Key components:
+- Agents: `src/mastra/agents/onboarding-agent.ts`
+- Tools: `src/mastra/tools/verification-tools.ts`
+- Handlers: `src/mastra/server/routes/onboarding.ts`
+- Route registry: `src/mastra/server/routes.ts`
+- Server bootstrap: `src/mastra/index.ts`
+
+***
+
+## Setup
+
+<Steps>
+  <Step title="Prepare project">
+    Install dependencies and place <code>OPENAI_API_KEY</code> (and optional <code>PORT</code>) in <code>.env</code>.
+  </Step>
+  <Step title="Define the agents">
+    Ensure <b>employee-onboarding</b> & <b>hr-workflow-manager</b> agents are exported. They should only act when mentioned (e.g., <code>@agent</code>) and call verification tools as needed.
+  </Step>
+  <Step title="Register routes">
+    Confirm onboarding handlers are exported from <code>routes/onboarding.ts</code> and aggregated in <code>server/routes.ts</code>. Wire into Mastra server (see <code>src/mastra/index.ts</code>).
+  </Step>
+  <Step title="Run locally">
+    Use <code>npm run dev</code>. If enabled, open <code>/swagger-ui</code> to explore endpoints.
+  </Step>
+  <Step title="Walk the workflow">
+    Call endpoints in order: initiate → employee-info → employment-info → process-document(s) → verify-identity → background-check → create-system-access → tax-info → check-compliance → status.
+  </Step>
+  <Step title="Connect to CometChat">
+    In Dashboard → AI Agents, set Provider=Mastra, Agent ID=<code>employee-onboarding</code>, Deployment URL=public generate endpoint.
+  </Step>
+</Steps>
+
+***
+
+## Project Structure
+
+Core files & folders:
+
+- Runtime & config
+  - `package.json`, `tsconfig.json`, `README.md`
+- Agents
+  - `src/mastra/agents/onboarding-agent.ts`
+- Tools
+  - `src/mastra/tools/verification-tools.ts`
+  - `src/mastra/tools/index.ts`
+- Server
+  - `src/mastra/server/routes/onboarding.ts`
+  - `src/mastra/server/routes.ts`
+  - `src/mastra/server/util/safeErrorMessage.ts`
+  - `src/mastra/index.ts`
+- Types
+  - `src/types/employee.ts`
+
+***
+
+## Step 1 - Create the Agent
+
+`employee-onboarding` agent should:
+
+- Use a model (e.g., `openai('gpt-4o')`).
+- Include tools: documentProcessor, identityVerifier, backgroundChecker, systemAccessCreator, complianceChecker.
+- Provide structured guidance & only respond when explicitly invoked in chat (mention pattern handled at application/instruction level).
+
+Add `hr-workflow-manager` for decision logic: escalation, thresholds (identity score, background risk, provisioning failures, compliance gaps).
+
+***
+
+## Step 2 - Register the Agent in Mastra
+
+In `src/mastra/index.ts` & `server/routes.ts`:
+
+- Expose onboarding APIs under `/api/onboarding/*`.
+- Ensure agent generation endpoints (e.g., `/api/agents/employee-onboarding/generate`) are accessible (Mastra auto‑generates if configured accordingly—update index if needed to import your `apiRoutes`).
+- Provide CORS / logging / persistence (add DB later — current demo uses in‑memory `Map`).
+
+***
+
+## Step 3 - Run the Agent
+
+Expected local base: `http://localhost:4001/api`
+
+<Steps>
+  <Step title="Install deps">Run <code>npm install</code>.</Step>
+  <Step title="Start server">Run <code>npm run dev</code>.</Step>
+  <Step title="Initiate onboarding">POST <code>/api/onboarding/initiate</code> to get an <code>employeeId</code>.</Step>
+  <Step title="Chat with agent">POST <code>/api/agents/employee-onboarding/generate</code> with a <code>messages</code> array referencing <code>@agent</code>.</Step>
+</Steps>
+
+Primary endpoints:
+
+- POST `/api/onboarding/initiate`
+- PUT `/api/onboarding/:employeeId/employee-info`
+- PUT `/api/onboarding/:employeeId/employment-info`
+- POST `/api/onboarding/:employeeId/process-document`
+- POST `/api/onboarding/:employeeId/verify-identity`
+- POST `/api/onboarding/:employeeId/background-check`
+- POST `/api/onboarding/:employeeId/create-system-access`
+- PUT `/api/onboarding/:employeeId/tax-info`
+- POST `/api/onboarding/:employeeId/check-compliance`
+- GET `/api/onboarding/:employeeId/status`
+
+(Plus agent generate endpoints if exposed.)
+
+***
+
+## Step 4 - Deploy the API
+
+- Run build: `npm run build`.
+- Serve via your preferred hosting (Render, Fly.io, AWS, etc.).
+- Ensure public HTTPS route exposes `/api/agents/employee-onboarding/generate`.
+- (Optional) Publish Swagger UI for interactive testing.
+
+***
+
+## Step 5 - Configure in CometChat
+
+<Steps>
+  <Step title="Dashboard">Open <a href="https://app.cometchat.com/" target="_blank" rel="noreferrer">CometChat Dashboard</a>.</Step>
+  <Step title="Add AI Agent">Navigate to <b>AI Agents</b> → Add New.</Step>
+  <Step title="Configure">Provider = Mastra, Agent ID = <code>employee-onboarding</code>, Deployment URL = public generate endpoint.</Step>
+  <Step title="Optional second agent">Add <code>hr-workflow-manager</code> for decision analytics.</Step>
+  <Step title="Enable">Save & toggle ON.</Step>
+</Steps>
+
+***
+
+## Step 6 - Customize in Chat Builder
+
+<Steps>
+  <Step title="Open variant">From AI Agents list select your onboarding agent variant.</Step>
+  <Step title="Customize & Deploy">Choose <b>Customize and Deploy</b>.</Step>
+  <Step title="Adjust UI">Theme, layout, features; confirm agent mapping.</Step>
+  <Step title="Preview">Test sample prompts & tool invocation responses.</Step>
+</Steps>
+
+<Frame>
+  <img src="https://mintcdn.com/cometchat-22654f5b/2U5tVIzH12dbbFtr/images/ai-agent-chat-builder-preview.png?fit=max&auto=format&q=85" width="1600" height="900" />
+</Frame>
+
+***
+
+## Step 7 - Integrate
+
+<CardGroup>
+  <Card title="No Code - Widget" icon={<img src="/docs/images/products/ai-agents.svg" alt="Widget" />} description="Embed / script" href="/widget/ai-agents" horizontal />
+  <Card title="React UI Kit" icon={<img src="/docs/images/icons/react.svg" alt="React" />} href="https://www.cometchat.com/docs/ui-kit/react/ai-assistant-chat" horizontal>Pre-built UI components</Card>
+</CardGroup>
+
+Your <b>employee-onboarding</b> agent is now usable in chat conversations.
+
+***
+
+## Step 8 - Test Your Setup
+
+<Steps>
+  <Step title="Agent responds">POST <code>/api/agents/employee-onboarding/generate</code> returns guided instructions.</Step>
+  <Step title="Workflow progresses">Statuses change after each endpoint call.</Step>
+  <Step title="Verification tools run">Document, identity, background, provisioning steps return mock results.</Step>
+  <Step title="Compliance finalizes">`check-compliance` sets status to <code>onboarding_completed</code> when all criteria pass.</Step>
+</Steps>
+
+Example curl:
+
+```bash
+# Initiate onboarding
+curl -X POST http://localhost:4001/api/onboarding/initiate -H 'Content-Type: application/json'
+```
+```bash
+# Upload personal info
+curl -X PUT http://localhost:4001/api/onboarding/EMPLOYEE_ID/employee-info \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "personalInfo": {
+      "firstName": "Jane",
+      "lastName": "Doe",
+      "dateOfBirth": "1992-03-10",
+      "ssn": "111-22-3333",
+      "phone": "555-000-1111",
+      "email": "jane.doe@example.com",
+      "address": {"street": "1 First St","city": "Metro","state": "CA","zipCode": "90001"}
+    },
+    "emergencyContact": {"name": "John Doe","relationship": "Spouse","phone": "555-222-3333"}
+  }'
+```
+```bash
+# Process a document (driver's license)
+curl -X POST http://localhost:4001/api/onboarding/EMPLOYEE_ID/process-document \
+  -H 'Content-Type: application/json' \
+  -d '{"documentType": "drivers_license", "documentImage": "base64data=="}'
+```
+```bash
+# Verify identity
+curl -X POST http://localhost:4001/api/onboarding/EMPLOYEE_ID/verify-identity -H 'Content-Type: application/json'
+```
+```bash
+# Background check
+curl -X POST http://localhost:4001/api/onboarding/EMPLOYEE_ID/background-check -H 'Content-Type: application/json'
+```
+```bash
+# Create system access
+curl -X POST http://localhost:4001/api/onboarding/EMPLOYEE_ID/create-system-access \
+  -H 'Content-Type: application/json' \
+  -d '{"accessRequirements": {"needsEmail": true, "needsLaptop": true, "needsBadge": true, "systemAccess": ["HR Portal","Time Tracking"]}}'
+```
+```bash
+# Tax info
+curl -X PUT http://localhost:4001/api/onboarding/EMPLOYEE_ID/tax-info \
+  -H 'Content-Type: application/json' \
+  -d '{"taxInfo": {"federalWithholdingStatus": "single", "stateWithholdingStatus": "single", "exemptions": 0}}'
+```
+```bash
+# Compliance
+curl -X POST http://localhost:4001/api/onboarding/EMPLOYEE_ID/check-compliance \
+  -H 'Content-Type: application/json' \
+  -d '{"hasI9Forms": true, "hasW4Forms": true, "hasOfferLetterSigned": true, "hasHandbookAcknowledgment": true}'
+```
+```bash
+# Status
+curl -X GET http://localhost:4001/api/onboarding/EMPLOYEE_ID/status -H 'Content-Type: application/json'
+```
+
+***
+
+## Workflow Status Flow
+
+1. `initiated`
+2. `personal_info_collected`
+3. `employment_info_collected`
+4. `i9_documents_uploaded`
+5. `identity_verification_completed`
+6. `background_check_completed`
+7. `system_access_created`
+8. `tax_forms_completed`
+9. `onboarding_completed`
+
+Error & review states: `verification_failed`, `requires_manual_review`.
+
+***
+
+## Security & Production Checklist
+
+- Add auth (API key/JWT) & restrict CORS.
+- Rate limit onboarding + document endpoints.
+- Validate all bodies with Zod (already in handlers).
+- Do not persist raw document images (demo simulates only).
+- Mask / hash sensitive identifiers if stored (e.g., SSN) when moving to a DB.
+- Implement structured logging & central error monitoring.
+- Migrate from in-memory `Map` to durable storage (Postgres, etc.).
+
+***
+
+## Troubleshooting
+
+| Issue | Suggestion |
+|-------|------------|
+| Agent silent | Ensure mention pattern & correct agent ID (`employee-onboarding`). |
+| 404 route | Confirm route registered in `server/routes.ts` & server restarted. |
+| Status not changing | Verify correct `employeeId` and sequential endpoint calls. |
+| Identity fails often | Randomized mock checks; retry or lower threshold in tool logic for testing. |
+| Compliance never completes | Ensure all booleans true and prior verification results recorded. |
+
+***
+
+## Environment Variables
+
+```bash .env
+OPENAI_API_KEY=""   # Required OpenAI key
+PORT=4001            # Dev / prod port (matches README)
+```
+
+(Configure additional variables for DB, logging, etc. in production.)
+
+***
+
+## Next Steps
+
+- Swap mock verifications with real OCR / background / HRIS integrations.
+- Add persistence & audit logging.
+- Add authentication + RBAC.
+- Extend tools for benefits enrollment & orientation scheduling.
+
+***
+
+Happy building! 🎉

@@ -1,0 +1,283 @@
+# Build Your Leave Approval Coordinator Workflow Agent with Mastra
+
+> Create a Mastra agent that analyzes employee leave requests, classifies type & duration, routes to the correct approver (auto, direct manager, HR manager, documentation required), returns approval status & next steps — then connect it to CometChat.
+
+***
+
+## What You’ll Build
+
+- **Mastra leave approval coordinator** (`leaveApprovalCoordinatorAgent`).
+- Deterministic routing logic: auto-approved | direct-manager | hr-manager | requires-documentation.
+- Priority classification (low / medium / high) + actionable next steps.
+- A workflow (`leave-approval-workflow`) wrapping a processing step.
+- CometChat AI Agent integration for in‑chat leave request automation.
+
+***
+
+## Prerequisites
+
+- Mastra project (this folder or `npx create-mastra@latest`).
+- Node.js 18+ (20+ recommended).
+- OpenAI API key in `.env` as `OPENAI_API_KEY`.
+- CometChat application.
+
+***
+
+## Quick links
+
+- **Project README**: ./README.md
+- **Main agent**: ./src/mastra/index.ts
+- **Coordinator logic**: ./src/mastra/agents/leave-approval-coordinator-agent.ts
+- **Approver (Direct Manager)**: ./src/mastra/agents/direct-manager-agent.ts
+- **Approver (HR Manager)**: ./src/mastra/agents/hr-manager-agent.ts
+- **Tool**: ./src/mastra/tools/leave-approval-coordinator-tool.ts
+- **Workflow**: ./src/mastra/workflows/leave-approval-workflow.ts
+- **Environment variables**: README → Environment Variables
+
+_Local dev base_: `http://localhost:4111/api`
+
+***
+
+## How it works
+
+The Leave Approval Coordinator combines rule-based keyword classification with delegated approver agents:
+
+- Parses the employee request content (free-form natural language).
+- Identifies leave category via keyword arrays:
+  - Auto-approval (short duration: half day, appointments)
+  - HR-managed (formal / regulated: maternity, medical, bereavement, FMLA, sabbatical, extended)
+  - Documentation required (medical certificate, surgery, hospital, legal, funeral)
+  - Otherwise routes to direct manager.
+- Generates a unique request ID and approximated duration if dates are missing (defaults applied).
+- Returns structured JSON fields: `routedTo`, `approved`, `priority`, `leaveDetails`, `nextSteps`.
+- Appends a summary line: `([routedTo] | approved: yes/no | priority: [priority])` for quick UI parsing.
+- Workflow (`leave-approval-workflow`) wraps the processing step for future multi-step extensions (e.g., validation, calendar sync, ticket creation).
+
+Key components:
+- Coordinator: `leave-approval-coordinator-agent.ts`
+- Direct Manager & HR Manager approval logic.
+- Workflow: `leave-approval-workflow.ts` (single step now; extendable).
+
+***
+
+## Setup
+
+<Steps>
+  <Step title="Prepare project">Install dependencies; create <code>.env</code> with <code>OPENAI_API_KEY</code>.</Step>
+  <Step title="Review agents">Read coordinator + approver agent files for instructions & message formats.</Step>
+  <Step title="Examine routing arrays">Open <code>leave-approval-coordinator-agent.ts</code> to refine keyword lists.</Step>
+  <Step title="Run locally">Start dev server with <code>npx mastra dev</code> or <code>npm run dev</code>.</Step>
+  <Step title="Test scenarios">Use curl examples below (auto, manager, HR, documentation required).</Step>
+  <Step title="Connect CometChat">Register <code>leaveApprovalCoordinatorAgent</code> in AI Agents dashboard.</Step>
+</Steps>
+
+***
+
+## Project Structure
+
+```
+leave-approval-coordinator-agent/
+├─ src/mastra/
+│  ├─ index.ts                        # Mastra bootstrap & agent registration
+│  ├─ agents/
+│  │  ├─ leave-approval-coordinator-agent.ts
+│  │  ├─ direct-manager-agent.ts
+│  │  └─ hr-manager-agent.ts
+│  ├─ tools/
+│  │  └─ leave-approval-coordinator-tool.ts
+│  └─ workflows/
+│     └─ leave-approval-workflow.ts
+├─ package.json
+├─ tsconfig.json
+├─ README.md
+└─ guides.mdx (this guide)
+```
+
+***
+
+## Step 1 - Coordinator Agent
+
+Ensure the agent (`leaveApprovalCoordinatorAgent`) exposes:
+
+- Professional instructions describing routing logic & summary pattern.
+- Tool: `leaveApprovalCoordinator` (if used in messages) for workflow or structured handling.
+- Summary suffix: `([routedTo] | approved: yes/no | priority: [priority])`.
+
+***
+
+## Step 2 - Workflow
+
+Workflow: `leave-approval-workflow.ts`
+
+- Defines step `process-leave-request` with Zod input/output schemas.
+- Calls internal coordinator instance; returns normalized structure.
+- Extend by chaining additional steps (calendar sync, notifications) before `.commit()`.
+
+***
+
+## Step 3 - Run the Agent
+
+<Steps>
+  <Step title="Install deps"><code>npm install</code></Step>
+  <Step title="Start dev server"><code>npx mastra dev</code></Step>
+  <Step title="Send request">POST <code>/api/agents/leaveApprovalCoordinatorAgent/generate</code></Step>
+  <Step title="Parse summary">Extract <code>routedTo</code>, <code>approved</code>, <code>priority</code> from final line.</Step>
+</Steps>
+
+Primary endpoint:
+- POST `/api/agents/leaveApprovalCoordinatorAgent/generate`
+
+(If workflow execution is exposed in your server config, you could add: POST `/api/workflows/leave-approval-workflow/run`.)
+
+***
+
+## Step 4 - Deploy the API
+
+- Build (optional): `npm run build`.
+- Deploy to your host (Render, Fly.io, AWS). Ensure HTTPS.
+- Expose public route: `/api/agents/leaveApprovalCoordinatorAgent/generate`.
+- Add auth (API key/JWT) before production usage.
+
+***
+
+## Step 5 - Configure in CometChat
+
+<Steps>
+  <Step title="Dashboard">Open <a href="https://app.cometchat.com/" target="_blank" rel="noreferrer">CometChat Dashboard</a>.</Step>
+  <Step title="AI Agents">Navigate to <b>AI Agents</b>.</Step>
+  <Step title="Add agent">Provider = Mastra, Agent ID = <code>leaveApprovalCoordinatorAgent</code>.</Step>
+  <Step title="Deployment URL">Public <code>/api/agents/leaveApprovalCoordinatorAgent/generate</code>.</Step>
+  <Step title="Enable">Save & toggle ON.</Step>
+</Steps>
+
+***
+
+## Step 6 - Customize in Chat Builder
+
+<Steps>
+  <Step title="Open variant">Select the Leave Approval agent variant.</Step>
+  <Step title="Customize & Deploy">Adjust theme, tone, disclaimers.</Step>
+  <Step title="Preview">Test auto-approval & HR escalation prompts.</Step>
+</Steps>
+
+<Frame>
+  <img src="https://mintcdn.com/cometchat-22654f5b/2U5tVIzH12dbbFtr/images/ai-agent-chat-builder-preview.png?fit=max&auto=format&q=85" width="1600" height="900" />
+</Frame>
+
+***
+
+## Step 7 - Integrate
+
+<CardGroup>
+  <Card title="No Code - Widget" icon={<img src="/docs/images/products/ai-agents.svg" alt="Widget" />} description="Embed / script" href="/widget/ai-agents" horizontal />
+  <Card title="React UI Kit" icon={<img src="/docs/images/icons/react.svg" alt="React" />} href="https://www.cometchat.com/docs/ui-kit/react/ai-assistant-chat" horizontal>Pre-built UI components</Card>
+</CardGroup>
+
+***
+
+## Step 8 - Test Your Setup
+
+<Steps>
+  <Step title="Auto-approved">Short appointment returns <code>routedTo=auto-approved</code>, <code>approved=true</code>, priority low.</Step>
+  <Step title="Direct manager">Vacation request routes to direct-manager.</Step>
+  <Step title="HR manager">Formal leave (maternity/medical) routes to hr-manager.</Step>
+  <Step title="Documentation required">Medical certificate hints route to requires-documentation, approved=false.</Step>
+</Steps>
+
+Example cURL:
+
+```bash
+# Auto-approved (half day)
+curl -s -X POST http://localhost:4111/api/agents/leaveApprovalCoordinatorAgent/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"I need a half day for a dental appointment next Tuesday"}]}'
+```
+```bash
+# Direct manager (vacation)
+curl -s -X POST http://localhost:4111/api/agents/leaveApprovalCoordinatorAgent/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"I would like vacation leave from July 10 to July 17"}]}'
+```
+```bash
+# HR manager (maternity leave)
+curl -s -X POST http://localhost:4111/api/agents/leaveApprovalCoordinatorAgent/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"I need maternity leave starting in March"}]}'
+```
+```bash
+# Documentation required (surgery)
+curl -s -X POST http://localhost:4111/api/agents/leaveApprovalCoordinatorAgent/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"I need medical leave for surgery and have a doctor note"}]}'
+```
+
+***
+
+## Routing Logic Summary
+
+| Route | Triggers (examples) | Approved | Priority | Notes |
+|-------|---------------------|----------|----------|-------|
+| auto-approved | half day, doctor/dental appointment, few hours | yes | low | Minimal steps |
+| direct-manager | routine vacation, personal leave | yes | medium | Coverage + handover |
+| hr-manager | maternity, medical, bereavement, extended, FMLA | yes | high | Formal policy oversight |
+| requires-documentation | surgery, hospital, medical certificate, legal, funeral | no | high | Needs supporting docs |
+
+***
+
+## Security & Production Checklist
+
+- Add authentication (API key/JWT) to agent endpoint.
+- Enforce rate limiting & request size limits.
+- Sanitize logs (no sensitive medical details in plaintext).
+- Externalize keyword lists to config or database.
+- Persist leave requests (DB) for audit & compliance.
+- Implement notification hooks (email/Slack) for hr-manager & documentation-required cases.
+- Add observability (latency, routing distribution metrics).
+
+***
+
+## Troubleshooting
+
+| Issue | Suggestion |
+|-------|------------|
+| Always routes to direct-manager | Expand keyword arrays; check lowercase handling. |
+| Auto-approvals not triggering | Verify phrases in `autoApprovedTypes` match user text. |
+| Missing summary line | Confirm agent instructions include ending format. |
+| Incorrect duration | Provide explicit start/end dates in request. |
+| Agent not found | Ensure `leaveApprovalCoordinatorAgent` is in `mastra.agents`. |
+
+***
+
+## Environment Variables
+
+```bash .env
+OPENAI_API_KEY=""   # Required OpenAI key
+PORT=4111            # Server port
+```
+
+(Optional) Add: LOG_LEVEL, AUTH_TOKEN, DB_URL when productionizing.
+
+***
+
+## Extending the Workflow
+
+- Add calendar sync step (Google / Outlook) after approval.
+- Integrate HRIS API for official leave record creation.
+- Add conflict detection (team coverage / blackout periods).
+- Implement SLA timers & reminder notifications.
+- Add analytics: approval volumes, lead time, route distribution.
+
+***
+
+## Next Steps
+
+- Replace keyword matching with embeddings + classification model.
+- Add localization for multi-region policy differences.
+- Add escalation chain if HR response pending > defined SLA.
+- Insert compliance check step for regulated leave categories.
+
+***
+
+> Disclaimer: This automated response is informational. Final approval may be subject to company HR policies and manager discretion.
+
+Happy building! 🎉
