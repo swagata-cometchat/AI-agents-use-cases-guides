@@ -1,0 +1,290 @@
+# Build Your Booking Workflow Agent with Mastra
+
+> Create a Mastra agent that orchestrates end‑to‑end booking operations: creation, confirmations, cancellations, refunds, and multi‑channel notifications — then connect it to CometChat.
+
+***
+
+## What You’ll Build
+
+- **Mastra agents** for booking lifecycle automation and workflow decisions.
+- Triggered only when explicitly mentioned (e.g., `@agent`).
+- REST endpoints for booking creation, confirmation, cancellation, refund, notification, and status tracking.
+- Integrated into **CometChat** chats for conversational booking support.
+
+***
+
+## Prerequisites
+
+- A Mastra project (`npx create-mastra@latest my-mastra-app`).
+- Node.js 18+ installed.
+- OpenAI API key in `.env` as `OPENAI_API_KEY`.
+- A CometChat app.
+
+***
+
+## Quick links
+
+- **Project README**: [README.md](./README.md)
+- **Swagger UI (local)**: [http://localhost:4111/swagger-ui](http://localhost:4111/swagger-ui)
+- **Environment variables**: see README → Environment Variables
+
+***
+
+## How it works
+
+This example implements a workflow‑oriented Booking Workflow Agent that:
+
+- Orchestrates bookings across discrete REST steps (create → confirm → cancel → refund → notify → status).
+- Uses tools in `src/mastra/tools/booking-tools.ts` to process confirmations, cancellations, refunds, and notifications.
+- Exposes two chat agents:
+  - `booking-workflow` — conversational booking assistance (explanations, policy guidance, recommended next steps).
+  - `workflow-manager` — decision & escalation logic (approval thresholds, manual review triggers).
+- Maintains in‑memory booking session records (see compiled output / server handlers) with defensive error messaging via `safeErrorMessage.ts`.
+
+Key components:
+- Agent: `src/mastra/agents/booking-agent.ts`
+- Tools: `src/mastra/tools/booking-tools.ts`, `src/mastra/tools/index.ts`
+- Routes: `src/mastra/server/routes/booking.ts`
+- Server registration: `src/mastra/server/routes.ts`, `src/mastra/index.ts`
+- Types & schemas: `src/types/booking.ts`
+
+***
+
+## Setup
+
+<Steps>
+  <Step title="Prepare project">
+    Install dependencies and add <code>OPENAI_API_KEY</code> (and optional notification/payment related vars) in <code>.env</code>.
+  </Step>
+
+  <Step title="Define the agents">
+    Ensure the <b>booking-workflow</b> agent guides users only when explicitly mentioned (e.g., <code>@agent</code>). Include a <b>workflow-manager</b> agent for escalation / approval decisions.
+  </Step>
+
+  <Step title="Register in server">
+    Register agents and expose booking routes under <code>/api/bookings/*</code>. Confirm <code>/api/agents/booking-workflow/generate</code> is active.
+  </Step>
+
+  <Step title="Run locally">
+    Start the dev server (<code>npm run dev</code>) and visit <a href="http://localhost:4111/swagger-ui" target="_blank" rel="noreferrer">Swagger UI</a> to explore endpoints.
+  </Step>
+
+  <Step title="Walk the workflow">
+    Create a booking, send confirmation, simulate cancellation, process refund, dispatch custom notifications, and fetch status.
+  </Step>
+
+  <Step title="Connect to CometChat">
+    In Dashboard → AI Agents, set Provider=Mastra, Agent ID=<code>booking-workflow</code>, URL pointing to your public generate endpoint.
+  </Step>
+</Steps>
+
+***
+
+## Project Structure
+
+Core files and folders:
+
+- Runtime & config
+  - `package.json`, `tsconfig.json`, `README.md`
+- Agents
+  - `src/mastra/agents/booking-agent.ts`
+- Tools
+  - `src/mastra/tools/booking-tools.ts`
+  - `src/mastra/tools/index.ts`
+- Server
+  - `src/mastra/index.ts`
+  - `src/mastra/server/routes.ts`
+  - `src/mastra/server/routes/booking.ts`
+  - `src/mastra/server/util/safeErrorMessage.ts`
+- Types
+  - `src/types/booking.ts`
+
+***
+
+## Step 1 - Create the Agent
+
+Ensure `src/mastra/agents/booking-agent.ts` registers an agent with:
+
+- `name`: <b>"booking-workflow"</b> → API path `/api/agents/booking-workflow/*`.
+- Behavior: respond only when explicitly mentioned (`@agent`), provide step guidance, and select appropriate tools.
+- Tools: confirmation, cancellation, refund, and notification processors from `booking-tools.ts`.
+
+***
+
+## Step 2 - Register the Agent in Mastra
+
+In `src/mastra/index.ts` & `src/mastra/server/routes.ts`:
+
+- Register agents: <b>booking-workflow</b>, <b>workflow-manager</b>.
+- Wire booking routes `/api/bookings/*`.
+- Enable Swagger UI for discovery.
+- Confirm server logs show route & agent registration on startup.
+
+***
+
+## Step 3 - Run the Agent
+
+Local API base: [http://localhost:4111/api](http://localhost:4111/api)
+
+<Steps>
+  <Step title="Install dependencies">Run <code>npm install</code>.</Step>
+  <Step title="Start dev server">Run <code>npm run dev</code>.</Step>
+  <Step title="Create booking">POST <code>/api/bookings/create</code>.</Step>
+  <Step title="Chat with agent">POST <code>/api/agents/booking-workflow/generate</code> (include <code>@agent</code> mention in message content).</Step>
+</Steps>
+
+API endpoints (see Swagger UI):
+
+- POST `/api/bookings/create` — create booking
+- POST `/api/bookings/:bookingId/send-confirmation` — send confirmation
+- POST `/api/bookings/:bookingId/cancel` — process cancellation
+- POST `/api/bookings/:bookingId/refund` — process refund
+- POST `/api/bookings/:bookingId/notify` — send custom notification
+- GET `/api/bookings/:bookingId/status` — booking status
+- POST `/api/agents/booking-workflow/generate` — chat with booking agent
+- POST `/api/agents/workflow-manager/generate` — workflow decision support
+
+***
+
+## Step 4 - Deploy the API
+
+- Ensure public route: **`/api/agents/booking-workflow/generate`** is reachable.
+- Provide Swagger UI link to internal stakeholders for verification.
+- Add auth & HTTPS termination at your edge / gateway in production.
+
+***
+
+## Step 5 - Configure in CometChat
+
+<Steps>
+  <Step title="Open Dashboard">Go to <a href="https://app.cometchat.com/" target="_blank" rel="noreferrer">CometChat Dashboard</a>.</Step>
+  <Step title="Navigate">Select your App → <b>AI Agents</b>.</Step>
+  <Step title="Add booking agent">Provider=Mastra, Agent ID=<code>booking-workflow</code>, Deployment URL= public generate endpoint.</Step>
+  <Step title="(Optional) Workflow agent">Add <b>workflow-manager</b> similarly for escalations.</Step>
+  <Step title="Enable">Save & ensure status toggle shows <b>Enabled</b>.</Step>
+</Steps>
+
+> For more on CometChat AI Agents, see official docs (Overview · Instructions · Custom agents).
+
+***
+
+## Step 6 - Customize in Chat Builder
+
+<Steps>
+  <Step title="Open variant">From <b>AI Agents</b> select the variant → Chat Builder.</Step>
+  <Step title="Customize & Deploy">Choose <b>Customize and Deploy</b>.</Step>
+  <Step title="Adjust settings">Theme, layout, features — attach the Booking Workflow agent.</Step>
+  <Step title="Preview">Validate responses & tool triggers.</Step>
+</Steps>
+
+<Frame>
+  <img src="https://mintcdn.com/cometchat-22654f5b/2U5tVIzH12dbbFtr/images/ai-agent-chat-builder-preview.png?fit=max&auto=format&n=2U5tVIzH12dbbFtr&q=85&s=7e5a476c0f779f984406b979ed12f972" width="5760" height="3200" />
+</Frame>
+
+***
+
+## Step 7 - Integrate
+
+<CardGroup>
+  <Card title="No Code - Widget" icon={<img src="/docs/images/products/ai-agents.svg" alt="Widget" />} description="Embed / script" href="/widget/ai-agents" horizontal />
+  <Card title="React UI Kit" icon={<img src="/docs/images/icons/react.svg" alt="React" />} href="https://www.cometchat.com/docs/ui-kit/react/ai-assistant-chat" horizontal>Pre Built UI Components</Card>
+</CardGroup>
+
+> The <b>booking-workflow</b> agent is now part of your exported configuration; users can interact immediately.
+
+***
+
+## Step 8 - Test Your Setup
+
+<Steps>
+  <Step title="Agent responds">POST <code>/api/agents/booking-workflow/generate</code> returns booking guidance.</Step>
+  <Step title="Agent listed">GET <code>/api/agents</code> includes <code>"booking-workflow"</code>.</Step>
+  <Step title="Workflow endpoints">Lifecycle calls update status correctly.</Step>
+  <Step title="End-to-end curl">Run sample commands below.</Step>
+</Steps>
+
+```bash
+# Chat with the booking workflow agent
+curl -X POST http://localhost:4111/api/agents/booking-workflow/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      { "role": "user", "content": "@agent I need to cancel booking BK123456789" }
+    ]
+  }'
+```
+
+```bash
+# Create a new booking
+curl -X POST http://localhost:4111/api/bookings/create \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "bookingReference": "BK123456789",
+    "customerInfo": {"firstName": "John", "lastName": "Doe", "email": "john@example.com", "phone": "+1-555-123-4567"},
+    "serviceDetails": {"serviceType": "hotel", "serviceName": "Grand Hotel Suite", "provider": "Grand Hotel Chain", "serviceDate": "2024-12-15", "bookingDate": "2024-01-15", "location": "New York, NY"},
+    "paymentInfo": {"totalAmount": 450, "currency": "USD", "paymentMethod": "credit_card", "paymentStatus": "paid"}
+  }'
+```
+
+***
+
+## Core Policies & Logic
+
+- Cancellation logic varies by `serviceType` (hotel, flight, car_rental, event_ticket, etc.).
+- Refund approval thresholds:
+  - ≤ $500 auto‑approve if validation score ≥ 75%
+  - $500–$2000 additional validation
+  - > $2000 manual review
+- Urgency affects notification timing (high vs normal vs low batching).
+
+***
+
+## Security & Production Checklist
+
+- Add auth (API key / JWT) to all mutation endpoints.
+- Restrict CORS to trusted origins.
+- Implement rate limiting & request size limits on generate & workflow routes.
+- Persist bookings in a durable store (replace in‑memory map) with encryption at rest.
+- Validate all inputs with Zod schemas; reject malformed or unexpected fields.
+- Sanitize outbound error messages (`safeErrorMessage.ts`).
+- Keep `OPENAI_API_KEY` server‑side only.
+- Add observability: structured logging + metrics (confirmation rate, refund SLA, cancellation rate).
+
+***
+
+## Troubleshooting
+
+- **Agent not responding**: Include explicit mention (`@agent`) & verify agent ID `booking-workflow`.
+- **404 routes**: Confirm server started and `/api/bookings/create` appears in Swagger UI.
+- **Refund denied unexpectedly**: Check amount vs threshold and validation score.
+- **Status stale**: Ensure same `bookingId` reused across subsequent steps.
+- **Notification missing**: Verify chosen channel (email/sms/both) & mock transport config.
+
+***
+
+## Environment Variables
+
+```bash .env
+OPENAI_API_KEY=""                 # Required: OpenAI model access
+PORT=4111                          # Server port
+DATABASE_URL="file:../mastra.db"   # Example persistence (replace for production)
+SMTP_HOST=""                      # Optional: Email provider
+SMS_API_KEY=""                    # Optional: SMS provider
+NODE_ENV=development               # Runtime environment
+```
+
+***
+
+## Next Extensions
+
+- Add payment gateway integration (Stripe / PayPal) for real transaction validation.
+- Persist bookings & events to a relational DB (schema migrations & audit logs).
+- Add idempotency keys for create & refund endpoints.
+- Introduce webhook callbacks for asynchronous provider updates.
+- Implement SLA dashboards & anomaly alerts (refund spikes, cancellation clustering).
+
+***
+
+## Summary
+
+You now have a Mastra Booking Workflow Agent capable of handling confirmations, cancellations, refunds, notifications, and conversational assistance — fully integrable with CometChat for real‑time customer support.

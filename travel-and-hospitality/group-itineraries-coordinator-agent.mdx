@@ -1,0 +1,286 @@
+# Build Your Group Itinerary Coordination Agent with Mastra
+
+> Create a Mastra agent + workflow that coordinates complex group travel: gathers requirements, routes to specialist coordinators (flights, lodging, activities, transport, budget), prioritizes needs, and returns consolidated next steps — then connect it to CometChat.
+
+***
+
+## What You’ll Build
+
+- **Mastra agent** for group itinerary intake & routing decisions.
+- **Workflow** (`group-itinerary-workflow`) with a coordination step that returns routing, priority, and next actions.
+- Tool-driven specialist routing via `itineraryCoordinator` tool.
+- Conversational endpoint for planning help inside **CometChat**.
+
+***
+
+## Prerequisites
+
+- A Mastra project (`npx create-mastra@latest my-mastra-app`).
+- Node.js 18+.
+- OpenAI API key in `.env` as `OPENAI_API_KEY`.
+- A CometChat app.
+
+***
+
+## Quick links
+
+- **Project README**: (add if present) `README.md`
+- **Agent file**: `src/mastra/agents/group-itinerary-coordinator-agent.ts` (name may vary per repo)
+- **Tool**: `src/mastra/tools/itinerary-coordinator-tool.ts`
+- **Workflow**: `src/mastra/workflows/group-itinerary-workflow.ts`
+- **Mastra setup**: `src/mastra/index.ts`
+
+> Note: File names above reflect intended structure; adjust if your repo differs.
+
+***
+
+## How it works
+
+This example provides a Group Itineraries Coordinator Agent plus a single-step workflow:
+
+- The agent collects: purpose, destination(s), dates, group size, budget, constraints.
+- It uses the `itineraryCoordinator` tool to infer which specialist to involve:
+  - `flight-coordinator`
+  - `accommodation-coordinator`
+  - `activity-coordinator`
+  - `transport-coordinator`
+  - `budget-coordinator`
+- The workflow step (`coordinate-itinerary`) returns:
+  - `routedTo` (specialist)
+  - `priority` (low | medium | high | urgent)
+  - `nextSteps` (action array)
+  - Optional `itineraryDetails` (groupId, dates, destination, estimatedCost, coordinatorContact)
+- Conversation responses always end with a footer like: `( [routedTo] | coordinated: yes/no | priority: [level] )` (enforced by system instructions).
+
+Key components:
+- Agent registration & memory: `src/mastra/index.ts`
+- Tool logic: `src/mastra/tools/itinerary-coordinator-tool.ts`
+- Workflow definition: `src/mastra/workflows/group-itinerary-workflow.ts`
+
+***
+
+## Setup
+
+<Steps>
+  <Step title="Prepare project">
+    Install deps and add <code>OPENAI_API_KEY</code> to <code>.env</code>. Optionally configure persistence DB path.
+  </Step>
+  <Step title="Define the agent">
+    Ensure the agent instructions enforce routing, clarifying questions, and response footer. Name currently is <code>"Group Itineraries Coordinator Agent"</code> (see <code>index.ts</code>).
+  </Step>
+  <Step title="Add workflow">
+    Confirm <code>groupItineraryWorkflow</code> is exported and registered in <code>Mastra</code> init.
+  </Step>
+  <Step title="Register tool">
+    The <code>itineraryCoordinator</code> tool must be included in the agent <code>tools</code> map.
+  </Step>
+  <Step title="Run locally">
+    Start dev server (<code>npm run dev</code>) and verify agent & workflow endpoints respond.
+  </Step>
+  <Step title="Connect to CometChat">
+    Use the agent ID (see below) in Dashboard → AI Agents → Provider=Mastra.
+  </Step>
+</Steps>
+
+***
+
+## Project Structure
+
+- Runtime & config
+  - `package.json`, `tsconfig.json`, `README.md`
+- Agents
+  - `src/mastra/agents/*coordinator-agent.ts` (specialized coordinators if added)
+- Primary Agent
+  - Defined inline in `src/mastra/index.ts` (can be extracted to its own file)
+- Tools
+  - `src/mastra/tools/itinerary-coordinator-tool.ts`
+  - `src/mastra/tools/index.ts`
+- Workflows
+  - `src/mastra/workflows/group-itinerary-workflow.ts`
+  - `src/mastra/workflows/index.ts`
+- Mastra bootstrap
+  - `src/mastra/index.ts`
+- Persistence / memory
+  - Uses `LibSQLStore` (in-memory for agent memory + file-based DB for core storage)
+
+***
+
+## Step 1 - Create (or Refine) the Agent
+
+Current implementation (see `src/mastra/index.ts`) creates the agent with:
+
+- Name: <b>"Group Itineraries Coordinator Agent"</b>
+- Model: <code>openai('gpt-4')</code>
+- Tool: <code>itineraryCoordinator</code>
+- Memory: ephemeral (LibSQL in-memory) — swap for persistent store in production.
+
+Recommendation: For cleaner API paths & CometChat config, you may rename the agent to <code>group-itineraries-coordinator</code> (slug form). Otherwise the auto-generated endpoint likely uses the object key <code>groupItinerariesCoordinatorAgent</code>.
+
+***
+
+## Step 2 - Register the Workflow
+
+The workflow `groupItineraryWorkflow` chains a single step `coordinate-itinerary`:
+
+Input schema (core fields):
+- `request` (string): coordination goal / context
+- `groupSize` (number, optional)
+- `budget` (number, optional)
+
+Output schema (selected fields):
+- `message` (string summary)
+- `routedTo` (specialist ID)
+- `coordinated` (boolean)
+- `priority` (low | medium | high | urgent)
+- `nextSteps` (string array)
+- (Optional) `itineraryDetails` object
+
+Use the workflow endpoint to decouple structured routing from conversational output.
+
+***
+
+## Step 3 - Run Locally
+
+<Steps>
+  <Step title="Install dependencies">Run <code>npm install</code>.</Step>
+  <Step title="Start server">Run <code>npm run dev</code>.</Step>
+  <Step title="Agent test">POST to <code>/api/agents/groupItinerariesCoordinatorAgent/generate</code> (or slug variant if renamed).</Step>
+  <Step title="Workflow test">POST to <code>/api/workflows/group-itinerary-workflow/start</code> with input JSON.</Step>
+</Steps>
+
+Example (agent conversation):
+```bash
+curl -X POST http://localhost:4111/api/agents/groupItinerariesCoordinatorAgent/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      { "role": "user", "content": "@agent We need a 5 day team retreat in Lisbon for 14 people under 18k USD" }
+    ]
+  }'
+```
+
+Example (workflow start):
+```bash
+curl -X POST http://localhost:4111/api/workflows/group-itinerary-workflow/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": "Plan Lisbon retreat with strategy workshop + 2 cultural activities",
+    "groupSize": 14,
+    "budget": 18000
+  }'
+```
+
+***
+
+## Step 4 - Deploy
+
+- Expose the agent generate endpoint publicly (HTTPS) — e.g. <code>/api/agents/groupItinerariesCoordinatorAgent/generate</code>.
+- Confirm workflow endpoint accessibility if you intend to trigger structured runs externally.
+- Provide your deployed URL when configuring CometChat.
+
+***
+
+## Step 5 - Configure in CometChat
+
+<Steps>
+  <Step title="Open Dashboard"><a href="https://app.cometchat.com/" target="_blank" rel="noreferrer">CometChat Dashboard</a>.</Step>
+  <Step title="Navigate">App → <b>AI Agents</b>.</Step>
+  <Step title="Add agent">Provider=Mastra, Agent ID=<code>groupItinerariesCoordinatorAgent</code> (or your slug), Deployment URL=<code>/api/agents/.../generate</code>.</Step>
+  <Step title="Enable">Save & ensure status shows <b>Enabled</b>.</Step>
+</Steps>
+
+***
+
+## Step 6 - Customize in Chat Builder
+
+<Steps>
+  <Step title="Open variant">Select the added agent → Chat Builder.</Step>
+  <Step title="Customize & Deploy">Click <b>Customize and Deploy</b>.</Step>
+  <Step title="Adjust settings">Theme, layout, features — ensure coordinator agent attached.</Step>
+  <Step title="Preview">Test multi-step prompts & check footer format.</Step>
+</Steps>
+
+<Frame>
+  <img src="https://mintcdn.com/cometchat-22654f5b/2U5tVIzH12dbbFtr/images/ai-agent-chat-builder-preview.png?fit=max&auto=format&q=85" width="5760" height="3200" />
+</Frame>
+
+***
+
+## Step 7 - Integrate
+
+<CardGroup>
+  <Card title="No Code - Widget" icon={<img src="/docs/images/products/ai-agents.svg" alt="Widget" />} description="Embed / script" href="/widget/ai-agents" horizontal />
+  <Card title="React UI Kit" icon={<img src="/docs/images/icons/react.svg" alt="React" />} href="https://www.cometchat.com/docs/ui-kit/react/ai-assistant-chat" horizontal>Pre Built UI Components</Card>
+</CardGroup>
+
+> Once connected, users can directly request group planning assistance.
+
+***
+
+## Step 8 - Test Your Setup
+
+<Steps>
+  <Step title="Agent responds">Agent endpoint returns routed summary with footer.</Step>
+  <Step title="Workflow runs">Workflow returns JSON output with <code>routedTo</code> & <code>priority</code>.</Step>
+  <Step title="Memory persists (session)">Conversation shows context recall across requests.</Step>
+  <Step title="Routing sensible">Different inputs change <code>routedTo</code> appropriately.</Step>
+</Steps>
+
+### Additional curl (priority / routing test)
+```bash
+curl -X POST http://localhost:4111/api/workflows/group-itinerary-workflow/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": "Need multi-city flights Paris → Rome → Athens for 22 engineers in May, flexible dates",
+    "groupSize": 22
+  }'
+```
+
+***
+
+## Security & Production Checklist
+
+- Add auth (API key/JWT) to agent & workflow endpoints.
+- Restrict CORS origins.
+- Rate limit conversation & workflow triggers.
+- Persist memory (replace in-memory LibSQL usage for agent memory).
+- Add observability: request IDs, structured logs, latency, tool call metrics.
+- Validate all input (Zod schemas in tools & workflow already help—extend as needed).
+- Enforce budget & groupSize sane limits server-side.
+- Use retry / backoff for external supplier APIs (if added later).
+
+***
+
+## Troubleshooting
+
+- **Agent not found**: Check object key in Mastra init — path likely `/api/agents/groupItinerariesCoordinatorAgent/generate`.
+- **Wrong routing**: Inspect tool logic in `itinerary-coordinator-tool.ts`; add clearer heuristics or scoring.
+- **Missing priority**: Ensure workflow step returns `priority` in its output object.
+- **Memory not retained**: Confirm Memory store not re-instantiated per request in production deployment.
+
+***
+
+## Environment Variables
+
+```bash .env
+OPENAI_API_KEY=""                 # Required: OpenAI model access
+PORT=4111                          # (if using a server wrapper)
+GROUP_ITINERARIES_DB="file:../group-itineraries.db"  # LibSQL store path
+NODE_ENV=development               # Environment mode
+```
+
+***
+
+## Next Extensions
+
+- Add multi-step workflow: intake → constraint-normalization → specialist-routing → aggregation.
+- Introduce cost estimation tool (dynamic quotes + currency normalization).
+- Slack / email notification tool for itinerary drafts.
+- Persistence layer for group sessions & change history.
+- Conflict detection (overlapping attendee date constraints) with diff suggestions.
+
+***
+
+## Summary
+
+You now have a Mastra Group Itinerary Coordination Agent + Workflow that can accept group travel context, route to the right specialist focus, prioritize tasks, and integrate with CometChat for collaborative planning.
